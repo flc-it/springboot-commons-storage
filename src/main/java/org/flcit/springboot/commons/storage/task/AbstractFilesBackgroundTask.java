@@ -22,7 +22,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Date;
+import java.time.Instant;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -121,8 +121,8 @@ abstract class AbstractFilesBackgroundTask implements InitializingBean, Runnable
         if (getLogger().isInfoEnabled()) {
             getLogger().info(String.format("%s retryTaskOnException - %s", ClassUtils.getShortName(this.getClass()), file), e);
         }
-        if (executor instanceof ThreadPoolTaskScheduler) {
-            ((ThreadPoolTaskScheduler) executor).schedule(() -> this.executeCommand(file), new Date(System.currentTimeMillis() + retryDelayOnException));
+        if (executor instanceof ThreadPoolTaskScheduler threadPoolTaskScheduler) {
+            threadPoolTaskScheduler.schedule(() -> this.executeCommand(file), Instant.now().plusMillis(retryDelayOnException));
         } else {
             if (getLogger().isWarnEnabled()) {
                 getLogger().warn("{} retryTaskOnException is not delayed !", ClassUtils.getShortName(this.getClass()));

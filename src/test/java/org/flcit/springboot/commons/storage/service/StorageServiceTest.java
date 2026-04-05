@@ -57,7 +57,7 @@ class StorageServiceTest {
     private static final WebApplicationContextRunner RUNNER = getWebApplicationContextRunner();
 
     @Test
-    void deleteKo() throws Exception {
+    void deleteKo() {
         RUNNER.run(context -> {
             final StorageService service = context.getBean(StorageService.class);
             mockFiles(() -> {
@@ -68,7 +68,7 @@ class StorageServiceTest {
     }
 
     @Test
-    void deleteOk() throws Exception {
+    void deleteOk() {
         RUNNER.run(context ->
             mockFiles(() -> assertFalse(context.getBean(StorageService.class).delete("files", System.currentTimeMillis() + "_test.json")))
         );
@@ -77,7 +77,7 @@ class StorageServiceTest {
     @Test
     void loadAsResponseEntityKo() {
         RUNNER.run(context -> {
-            try (MockedConstruction<UrlResource> mock = mockConstructionWithAnswer(UrlResource.class, (c) -> { throw new MalformedURLException(); })) {
+            try (MockedConstruction<UrlResource> mock = mockConstructionWithAnswer(UrlResource.class, c -> { throw new MalformedURLException(); })) {
                 final StorageService service = context.getBean(StorageService.class);
                 final String filename = System.currentTimeMillis() + "_test.json";
                 assertThrows(StorageFileNotFoundException.class, () -> service.loadAsResponseEntity("files", filename, "test.json"));
