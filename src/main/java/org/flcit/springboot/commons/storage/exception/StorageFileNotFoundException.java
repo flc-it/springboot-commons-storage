@@ -16,8 +16,7 @@
 
 package org.flcit.springboot.commons.storage.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.flcit.springboot.commons.core.http.ResponseStatus;
 
 /**
  * 
@@ -25,8 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
  * @author Florian Lestic
  */
 @SuppressWarnings("java:S110")
-@ResponseStatus(HttpStatus.NOT_FOUND)
-public class StorageFileNotFoundException extends StorageException {
+public class StorageFileNotFoundException extends StorageException implements ResponseStatus {
 
     private static final long serialVersionUID = 1L;
 
@@ -36,6 +34,11 @@ public class StorageFileNotFoundException extends StorageException {
 
     public StorageFileNotFoundException(String message, Throwable cause) {
         super(message, cause);
+    }
+
+    @Override
+    public int code() {
+        return 404;
     }
 
 }

@@ -16,8 +16,7 @@
 
 package org.flcit.springboot.commons.storage.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.flcit.springboot.commons.core.http.ResponseStatus;
 
 /**
  * 
@@ -25,8 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
  * @author Florian Lestic
  */
 @SuppressWarnings("java:S110")
-@ResponseStatus(HttpStatus.CONFLICT)
-public class DoublonException extends RejetException {
+public class DoublonException extends RejetException implements ResponseStatus {
 
     private static final long serialVersionUID = 1L;
 
@@ -35,6 +33,11 @@ public class DoublonException extends RejetException {
      */
     public DoublonException(String message) {
         super(message);
+    }
+
+    @Override
+    public int code() {
+        return 409;
     }
 
 }

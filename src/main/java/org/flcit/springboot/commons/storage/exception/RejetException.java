@@ -18,18 +18,15 @@ package org.flcit.springboot.commons.storage.exception;
 
 import java.nio.file.Path;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
-
 import org.flcit.commons.core.exception.BasicRuntimeException;
+import org.flcit.springboot.commons.core.http.ResponseStatus;
 
 /**
  * 
  * @since 
  * @author Florian Lestic
  */
-@ResponseStatus(HttpStatus.BAD_REQUEST)
-public class RejetException extends BasicRuntimeException {
+public class RejetException extends BasicRuntimeException implements ResponseStatus {
 
     private static final long serialVersionUID = 1L;
     @SuppressWarnings({ "java:S1948", "java:S1165" })
@@ -59,6 +56,11 @@ public class RejetException extends BasicRuntimeException {
      */
     public void setTargetDirectory(Path targetDirectory) {
         this.targetDirectory = targetDirectory;
+    }
+
+    @Override
+    public int code() {
+        return 404;
     }
 
 }

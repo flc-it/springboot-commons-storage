@@ -27,9 +27,10 @@ import java.util.Date;
 import java.util.concurrent.Executor;
 
 import org.springframework.util.FileSystemUtils;
-import org.springframework.web.client.RestClientResponseException;
 
 import org.flcit.commons.core.file.util.FileUtils;
+import org.flcit.commons.core.util.ClassUtils;
+import org.flcit.commons.core.util.ReflectionUtils;
 import org.flcit.springboot.commons.storage.exception.DoublonException;
 import org.flcit.springboot.commons.storage.exception.RejetException;
 
@@ -211,7 +212,7 @@ public abstract class SimpleFilesBackgroundTask extends AbstractScanFilesBackgro
         if (e instanceof DoublonException) {
             moveOrDelete(file, true, targetDirectoryOnDoublonException);
         } else {
-            Path target = moveOrDelete(file, deleteFileOnException, e instanceof RejetException && ((RejetException) e).getTargetDirectory() != null ? ((RejetException) e).getTargetDirectory() : targetDirectoryOnException);
+            Path target = moveOrDelete(file, deleteFileOnException, e instanceof RejetException rejetException && rejetException.getTargetDirectory() != null ? ((RejetException) e).getTargetDirectory() : targetDirectoryOnException);
             if (target != null) {
                 writeErrorFile(target, e);
             }
@@ -225,9 +226,9 @@ public abstract class SimpleFilesBackgroundTask extends AbstractScanFilesBackgro
         Path errorFile = Files.isDirectory(target) ? target.resolve("error.log") : FileUtils.setExtension(target, "_error.log");
         getLogger().info("SimpleFilesBackgroundTask writeErrorFile - {}", errorFile);
         try (PrintStream ps = new PrintStream(errorFile.toFile())) {
-            if (e instanceof RestClientResponseException) {
+            if (ClassUtils.safeIsAssignableFrom("org.springframework.web.client.RestClientResponseException", e.getClass())) {
                 ps.println("Response body :");
-                ps.write(((RestClientResponseException) e).getResponseBodyAsByteArray());
+                ps.write((byte[]) ReflectionUtils.getSafeMethodValue(e, "getResponseBodyAsByteArray"));
                 ps.println();
             }
             e.printStackTrace(ps);

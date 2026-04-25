@@ -37,20 +37,18 @@ import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.flcit.commons.core.functional.runnable.RunnableException;
+import org.flcit.springboot.commons.storage.configuration.StorageProperties;
+import org.flcit.springboot.commons.storage.exception.StorageException;
+import org.flcit.springboot.commons.storage.exception.StorageFileNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.util.FileCopyUtils;
 import org.springframework.web.multipart.MultipartFile;
-
-import org.flcit.commons.core.functional.runnable.RunnableException;
-import org.flcit.springboot.commons.storage.configuration.StorageProperties;
-import org.flcit.springboot.commons.storage.exception.StorageException;
-import org.flcit.springboot.commons.storage.exception.StorageFileNotFoundException;
 
 class StorageServiceTest {
 
@@ -80,7 +78,7 @@ class StorageServiceTest {
             try (MockedConstruction<UrlResource> mock = mockConstructionWithAnswer(UrlResource.class, c -> { throw new MalformedURLException(); })) {
                 final StorageService service = context.getBean(StorageService.class);
                 final String filename = System.currentTimeMillis() + "_test.json";
-                assertThrows(StorageFileNotFoundException.class, () -> service.loadAsResponseEntity("files", filename, "test.json"));
+                assertThrows(StorageFileNotFoundException.class, () -> service.loadAsResource("files", filename));
             }
             try (MockedConstruction<UrlResource> mock = mockConstruction(UrlResource.class, (m, c) -> {
                 when(m.exists()).thenReturn(false);
@@ -88,7 +86,7 @@ class StorageServiceTest {
             })) {
                 final StorageService service = context.getBean(StorageService.class);
                 final String filename = System.currentTimeMillis() + "_test.json";
-                assertThrows(StorageFileNotFoundException.class, () -> service.loadAsResponseEntity("files", filename, "test.json"));
+                assertThrows(StorageFileNotFoundException.class, () -> service.loadAsResource("files", filename));
             }
         });
     }
@@ -97,28 +95,25 @@ class StorageServiceTest {
     void loadAsResponseEntityOk() {
         RUNNER.run(context -> {
             final String filenameTechnique = System.currentTimeMillis() + "_test.json";
-            final String filename = "test.json";
             try (MockedConstruction<UrlResource> mock = mockConstruction(UrlResource.class, (m, c) -> {
                 when(m.getFilename()).thenReturn(filenameTechnique);
                 when(m.exists()).thenReturn(true);
             })) {
-                checkLoadAsResponseEntityOk(context.getBean(StorageService.class).loadAsResponseEntity("files", filenameTechnique, filename), filename);
+                checkLoadAsResourceOk(context.getBean(StorageService.class).loadAsResource("files", filenameTechnique), filenameTechnique);
             }
             try (MockedConstruction<UrlResource> mock = mockConstruction(UrlResource.class, (m, c) -> {
                 when(m.getFilename()).thenReturn(filenameTechnique);
                 when(m.exists()).thenReturn(false);
                 when(m.isReadable()).thenReturn(true);
             })) {
-                checkLoadAsResponseEntityOk(context.getBean(StorageService.class).loadAsResponseEntity("files", filenameTechnique, filename), filename);
+                checkLoadAsResourceOk(context.getBean(StorageService.class).loadAsResource("files", filenameTechnique), filenameTechnique);
             }
         });
     }
 
-    private static final void checkLoadAsResponseEntityOk(final ResponseEntity<?> response, final String filename) {
-        assertInstanceOf(Resource.class, response.getBody());
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getHeaders().getContentDisposition());
-        assertEquals(filename, response.getHeaders().getContentDisposition().getFilename());
+    private static final void checkLoadAsResourceOk(final Resource response, final String filename) {
+        assertInstanceOf(Resource.class, response);
+        assertEquals(filename, response.getFilename());
     }
 
     @Test
@@ -145,13 +140,11 @@ class StorageServiceTest {
     void copyKo() {
         RUNNER.run(context -> {
             final StorageService service = context.getBean(StorageService.class);
-            assertThrows(StorageException.class, () -> service.copy(null, "files", "test.json"));
+            assertThrows(StorageException.class, () -> service.copy(null, "test.json", "files", "test.json"));
             final MultipartFile mf = mock(MultipartFile.class);
-            when(mf.isEmpty()).thenReturn(true);
-            assertThrows(StorageException.class, () -> service.copy(mf, "files", "test.json"));
             when(mf.isEmpty()).thenReturn(false);
-            doThrow(IOException.class).when(mf).transferTo(any(Path.class));
-            assertThrows(StorageException.class, () -> service.copy(mf, "files", "test.json"));
+            doThrow(IOException.class).when(mf).getInputStream();
+            assertThrows(StorageException.class, () -> service.copy(mf, "test.json", "files", "test.json"));
         });
     }
 
@@ -161,10 +154,14 @@ class StorageServiceTest {
             final StorageService service = context.getBean(StorageService.class);
             final MultipartFile mf = mock(MultipartFile.class);
             when(mf.getOriginalFilename()).thenReturn("test.json");
-            final Path res = service.copy(mf, "files", "test-name.json");
-            assertNotNull(res);
-            assertEquals("test-name.json", res.toFile().getName());
-            assertEquals("test.json", service.copy(mf, "files", null).toFile().getName());
+            try (MockedStatic<Files> mock = mockStatic(Files.class)) {
+                try (MockedStatic<FileCopyUtils> mock2 = mockStatic(FileCopyUtils.class)) {
+                    final Path res = service.copy(mf, mf.getOriginalFilename(), "files", "test-name.json");
+                    assertNotNull(res);
+                    assertEquals("test-name.json", res.toFile().getName());
+                    assertEquals("test.json", service.copy(mf, mf.getOriginalFilename(), "files", null).toFile().getName());
+                }
+            }
         });
     }
 
@@ -174,10 +171,14 @@ class StorageServiceTest {
             final StorageService service = context.getBean(StorageService.class);
             final MultipartFile mf = mock(MultipartFile.class);
             when(mf.getOriginalFilename()).thenReturn("test.json");
-            final Path res = service.copyWithUniqueId(mf, "files", 150);
-            assertNotNull(res);
-            assertNotNull(res.toFile().getName());
-            assertTrue(res.toFile().getName().endsWith("test.json"));
+            try (MockedStatic<Files> mock = mockStatic(Files.class)) {
+                try (MockedStatic<FileCopyUtils> mock2 = mockStatic(FileCopyUtils.class)) {
+                    final Path res = service.copyWithUniqueId(mf, mf.getOriginalFilename(), "files", 150);
+                    assertNotNull(res);
+                    assertNotNull(res.toFile().getName());
+                    assertTrue(res.toFile().getName().endsWith("test.json"));
+                }
+            }
         });
     }
 

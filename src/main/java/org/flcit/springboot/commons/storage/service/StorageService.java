@@ -23,19 +23,17 @@ import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
 import org.flcit.commons.core.file.util.FileUtils;
-import org.flcit.springboot.commons.core.file.util.ResponseFileUtils;
 import org.flcit.commons.core.util.StringUtils;
 import org.flcit.springboot.commons.storage.configuration.StorageProperties;
 import org.flcit.springboot.commons.storage.exception.StorageException;
 import org.flcit.springboot.commons.storage.exception.StorageFileNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamSource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.stereotype.Service;
+import org.springframework.util.FileCopyUtils;
 
 /**
  * 
@@ -60,8 +58,8 @@ public class StorageService {
      * @param maxLength
      * @return
      */
-    public Path copyWithUniqueId(MultipartFile file, String directory, int maxLength) {
-        return copy(file, directory, FileUtils.addUniqueId(file.getOriginalFilename(), maxLength));
+    public Path copyWithUniqueId(InputStreamSource file, String originalFilename, String directory, int maxLength) {
+        return copy(file, originalFilename, directory, FileUtils.addUniqueId(originalFilename, maxLength));
     }
 
     /**
@@ -70,23 +68,20 @@ public class StorageService {
      * @param name
      * @return
      */
-    public Path copy(MultipartFile file, String directory, String name) {
-        return copy(file, load(directory), name);
+    public Path copy(InputStreamSource file, String originalFilename, String directory, String name) {
+        return copy(file, originalFilename, load(directory), name);
     }
 
-    private Path copy(MultipartFile file, Path path, String name) {
+    private Path copy(InputStreamSource file, String originalFilename, Path path, String name) {
         if (file == null) {
             throw new StorageException("Failed to store nullable file: " + name);
         }
-        if (file.isEmpty()) {
-            throw new StorageException("Failed to store empty file: " + file.getOriginalFilename());
-        }
         try {
-            path = path.resolve(StringUtils.toIso88591(org.springframework.util.StringUtils.hasLength(name) ? name : file.getOriginalFilename()));
-            file.transferTo(path);
+            path = path.resolve(StringUtils.toIso88591(org.springframework.util.StringUtils.hasLength(name) ? name : originalFilename));
+            FileCopyUtils.copy(file.getInputStream(), Files.newOutputStream(path));
             return path;
         } catch (IOException e) {
-            throw new StorageException("Failed to store file: " + file.getOriginalFilename(), e);
+            throw new StorageException("Failed to store file: " + originalFilename, e);
         }
     }
 
@@ -139,7 +134,7 @@ public class StorageService {
         return Files.newInputStream(this.load(directory).resolve(filename));
     }
 
-    private Resource loadAsResource(String directory, String filename) {
+    public Resource loadAsResource(String directory, String filename) {
         return loadAsResource(load(directory, filename));
     }
 
@@ -154,16 +149,6 @@ public class StorageService {
         } catch (MalformedURLException e) {
             throw new StorageFileNotFoundException(String.format(FORMAT_NOT_READ_FILE, file.getFileName()), e);
         }
-    }
-
-    /**
-     * @param directory
-     * @param filename
-     * @param newName
-     * @return
-     */
-    public ResponseEntity<Resource> loadAsResponseEntity(String directory, String filename, String newName) {
-        return ResponseFileUtils.get(loadAsResource(directory, filename), newName);
     }
 
 }
